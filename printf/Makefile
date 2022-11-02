@@ -1,16 +1,21 @@
 TARGET = main
 
 # Default target chip.
+MCU ?=STM32F103C6
 #MCU ?= STM32F103C8
-MCU ?= STM32L432KC
+#MCU ?= STM32L432KC
 
 # Define target chip information.
 ifeq ($(MCU), STM32L432KC)
 	MCU_FILES = STM32L432KC
 	ST_MCU_DEF = STM32L432xx
 	MCU_CLASS = L4
-else ifeq($(MCU), STM32F103C8)
+else ifeq ($(MCU), STM32F103C8)
 	MCU_FILES = STM32F103C8
+	ST_MCU_DEF = STM32F103xB
+	MCU_CLASS = F1
+else ifeq ($(MCU), STM32F103C6)
+	MCU_FILES = STM32F103C6
 	ST_MCU_DEF = STM32F103xB
 	MCU_CLASS = F1
 endif
@@ -97,10 +102,8 @@ OBJS  = $(AS_SRC:.S=.o)
 OBJS += $(C_SRC:.c=.o)
 
 .PHONY: all
-all: $(TARGET).bin
+all: $(TARGET).bin $(TARGET).hex
 
-./$(ST_MCU_DEF)_vt.S:
-	python generate_vt.py $(ST_MCU_DEF) $(MCU_SPEC)
 
 %.o: %.S
 	$(CC) -x assembler-with-cpp $(ASFLAGS) $< -o $@
@@ -115,9 +118,14 @@ $(TARGET).bin: $(TARGET).elf
 	$(OC) -S -O binary $< $@
 	$(OS) $<
 
+$(TARGET).hex: $(TARGET).elf
+	$(OC) -S -O ihex $< $@
+	$(OS) $<
+
 .PHONY: clean
 clean:
 	rm -f $(OBJS)
 	rm -f $(ST_MCU_DEF)_vt.S
 	rm -f $(TARGET).elf
 	rm -f $(TARGET).bin
+	rm -f $(TARGET).hex
