@@ -56,6 +56,14 @@ void init() {
 
 }
 
+// delay in microseconds
+void delay( uint32_t us ) {
+  us *= ( SystemCoreClock / 1000000 ) / 5;
+  while( us-- ) {
+    __asm__( "NOP" );
+  }
+}
+
 int main() {
     init();
     while (1) {
@@ -64,5 +72,6 @@ int main() {
         ADC_value = ADC1->DR; // Read conversion result
         printf("ADC value: %d", ADC_value);
         printf("\r\n");
+        delay(2000000);
     }
 }
