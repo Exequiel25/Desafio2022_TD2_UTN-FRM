@@ -9,7 +9,7 @@
 
 uint16_t ADC_value = 0;
 
-uint32_t SystemCoreClock = 8000000;
+uint32_t SystemCoreClock = 8000000; // as default 8MHz is used
 extern uint32_t _sidata, _sdata, _edata, _sbss, _ebss;
 
 // Reset handler: set the stack pointer and branch to main().
