@@ -37,21 +37,12 @@ int _write( int handle, char* data, int size ) {
   }
   return size;
 }
-/*--------------------------------------------------------------------------*/
-// delay function in miliseconds
-void delayMS( uint32_t ms ) {
-  uint32_t i;
-  for( i = 0; i < ms/2; i++ ) {
-    uint32_t j;
-    for( j = 0; j < 1000; j++ ) {
-      __asm__( "NOP" );
-    }
-  }
-}
-/*--------------------------------------------------------------------------*/
-void init_usart()
-{
-// Copy initialized data from .sidata (Flash) to .data (RAM)
+
+/**
+ * Main program.
+ */
+int main( void ) {
+  // Copy initialized data from .sidata (Flash) to .data (RAM)
   memcpy( &_sdata, &_sidata, ( ( void* )&_edata - ( void* )&_sdata ) );
   // Clear the .bss section in RAM.
   memset( &_sbss, 0x00, ( ( void* )&_ebss - ( void* )&_sbss ) );
@@ -120,114 +111,17 @@ void init_usart()
 
   // Enable the USART peripheral.
   USART2->CR1 |= ( USART_CR1_RE | USART_CR1_TE | USART_CR1_UE );
-}
-/*--------------------------------------------------------------------------*/
-// adc init function
-void init_adc()
-{
-  // Enable peripheral clocks: GPIOA, ADC1.
-  #ifdef VVC_F1
-    RCC->APB2ENR |= ( RCC_APB2ENR_IOPAEN | RCC_APB2ENR_ADC1EN );
-  #elif VVC_L4
-    RCC->AHB2ENR |= ( RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_ADCEN );
-  #endif
 
-  // Configure pin A0 for ADC1.
-  #ifdef VVC_F1
-    GPIOA->CRL &= ~( GPIO_CRL_MODE0 | GPIO_CRL_CNF0 );
-    GPIOA->CRL |=  ( 0x0 << GPIO_CRL_MODE0_Pos | 0x0 << GPIO_CRL_CNF0_Pos );
-  #elif VVC_L4
-    GPIOA->MODER &= ~( 0x3 << ( 0 * 2 ) );
-    GPIOA->MODER |=  ( 0x3 << ( 0 * 2 ) );
-  #endif
-
-  // Set the ADC clock prescaler.
-  #ifdef VVC_F1
-    RCC->CFGR &= ~( RCC_CFGR_ADCPRE );
-    RCC->CFGR |=  ( 0x0 << RCC_CFGR_ADCPRE_Pos );
-  #elif VVC_L4
-    RCC->CCIPR &= ~( RCC_CCIPR_ADCSEL );
-    RCC->CCIPR |=  ( 0x0 << RCC_CCIPR_ADCSEL_Pos );
-  #endif
-
-  // Set the ADC sample time.
-  #ifdef VVC_F1
-    ADC1->SMPR2 &= ~( ADC_SMPR2_SMP0 );
-    ADC1->SMPR2 |=  ( 0x7 << ADC_SMPR2_SMP0_Pos );
-  #elif VVC_L4
-    ADC->SMPR &= ~( ADC_SMPR_SMP_0 );
-    ADC->S
-[...]
-
-MPR |=  ( 0x7 << ADC_SMPR_SMP_0_Pos );
-  #endif
-
-  // Enable the ADC peripheral.
-  #ifdef VVC_F1
-    ADC1->CR2 |= ( ADC_CR2_ADON );
-  #elif VVC_L4
-    ADC->CR |= ( ADC_CR_ADEN );
-    while ( ( ADC->ISR & ADC_ISR_ADRDY ) == 0 ) {};
-  #endif
-}
-/*--------------------------------------------------------------------------*/
-// adc read function
-uint16_t read_adc()
-{
-  // Start the ADC conversion.
-  #ifdef VVC_F1
-    ADC1->CR2 |= ( ADC_CR2_SWSTART );
-  #elif VVC_L4
-    ADC->CR |= ( ADC_CR_ADSTART );
-  #endif
-
-  // Wait for the ADC conversion to complete.
-  #ifdef VVC_F1
-    while ( ( ADC1->SR & ADC_SR_EOC ) == 0 ) {};
-  #elif VVC_L4
-    while ( ( ADC->ISR & ADC_ISR_EOC ) == 0 ) {};
-  #endif
-
-  // Read the ADC conversion result.
-  #ifdef VVC_F1
-    return ADC1->DR;
-  #elif VVC_L4
-    return ADC->DR;
-  #endif
-}
-/*--------------------------------------------------------------------------*/
-// main function
-int main()
-{
-  // Initialize the USART.
-  init_usart();
-
-  // Initialize the ADC.
-  init_adc();
-
-  delayMS(200);
-  printf( "\r\nDesafio 2022\r\n");
-
-  // Loop forever.
-  while ( 1 )
-  {
-    // Read the ADC.
-    uint16_t adc = read_adc();
-
-    // Send the ADC value over the USART.
-    printf( "ADC:%u\r\n",adc);
-
-    // Calculate the ADC voltage.
-    float voltage = ( ( float ) adc / 4095.0 ) * 3.3;
-    // Convert float to int
-    int voltage_int = (int) (voltage);
-    int voltage_dec = (int) ((voltage - voltage_int) * 1000);
-    
-    // Send the ADC voltage over the USART.
-    printf( "V:%d.%d\r\n",voltage_int,voltage_dec);
-
-    // delay 2 seconds
-    delayMS(2000);
-    
+  // Main loop: wait for a new byte, then echo it back.
+  char rxb = '\0';
+  while ( 1 ) {
+    #ifdef VVC_F1
+      while( !( USART2->SR & USART_SR_RXNE ) ) {};
+      rxb = USART2->DR;
+    #elif VVC_L4
+      while( !( USART2->ISR & USART_ISR_RXNE ) ) {};
+      rxb = USART2->RDR;
+    #endif
+    printf( "RX: %c\r\n", rxb );
   }
 }
