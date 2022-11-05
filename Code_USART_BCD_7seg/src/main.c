@@ -10,8 +10,6 @@
   #include "stm32l4xx.h"
 #endif
 
-uint32_t BaudRate = 1200;
-uint32_t SystemCoreClock = 0;
 extern uint32_t _sidata, _sdata, _edata, _sbss, _ebss;
 
 // Reset handler: set the stack pointer and branch to main().
@@ -38,12 +36,12 @@ int _write( int handle, char* data, int size ) {
   return size;
 }
 /*--------------------------------------------------------------------------*/
-// delay function in miliseconds
-void delayMS( uint32_t ms ) {
+// delay function (in milliseconds)
+void delay( uint32_t ms ) {
   uint32_t i;
-  for( i = 0; i < ms/2; i++ ) {
+  for( i = 0; i < ms; i++ ) {
     uint32_t j;
-    for( j = 0; j < 1000; j++ ) {
+    for( j = 0; j < 464; j++ ) {
       __asm__( "NOP" );
     }
   }
@@ -62,7 +60,7 @@ void init_usart()
   // Set the core system clock speed.
   #ifdef VVC_F1
     // Default clock source is the 8MHz internal oscillator.
-    SystemCoreClock = 8000000;
+    uint32_t SystemCoreClock = 8000000;
   #elif VVC_L4
     // Default clock source is the "multi-speed" internal oscillator.
     // Switch to the 16MHz HSI oscillator.
@@ -110,6 +108,7 @@ void init_usart()
   #endif
 
   // Set the baud rate.
+  uint16_t BaudRate = 1200;
   uint16_t uartdiv = SystemCoreClock / BaudRate;
   #ifdef VVC_F1
     USART2->BRR = ( ( ( uartdiv / 16 ) << USART_BRR_DIV_Mantissa_Pos ) |
@@ -196,6 +195,44 @@ uint16_t read_adc()
   #endif
 }
 /*--------------------------------------------------------------------------*/
+// init GPIOA and GPIOB for using a 7 segment display
+void init_gpio()
+{
+  // Enable peripheral clocks: GPIOB.
+  #ifdef VVC_F1
+    RCC->APB2ENR |= ( RCC_APB2ENR_IOPBEN );
+  #elif VVC_L4
+    RCC->AHB2ENR |= ( RCC_AHB2ENR_GPIOBEN );
+  #endif
+
+  // Configure pins B0, B1, B2, B3, B4, B5, B6, B7 for output.
+  #ifdef VVC_F1
+    GPIOB->CRL &= ~( GPIO_CRL_MODE0 | GPIO_CRL_MODE1 | GPIO_CRL_MODE2 |
+                     GPIO_CRL_MODE3 | GPIO_CRL_MODE4 | GPIO_CRL_MODE5 |
+                     GPIO_CRL_MODE6 | GPIO_CRL_MODE7 );
+    GPIOB->CRL |=  ( 0x3 << GPIO_CRL_MODE0_Pos | 0x3 << GPIO_CRL_MODE1_Pos |
+                     0x3 << GPIO_CRL_MODE2_Pos | 0x3 << GPIO_CRL_MODE3_Pos |
+                     0x3 << GPIO_CRL_MODE4_Pos | 0x3 << GPIO_CRL_MODE5_Pos |
+                     0x3 << GPIO_CRL_MODE6_Pos | 0x3 << GPIO_CRL_MODE7_Pos );
+  #elif VVC_L4
+    GPIOB->MODER &= ~( 0x3 << ( 0 * 2 ) | 0x3 << ( 1 * 2 ) | 0x3 << ( 2 * 2 ) |
+                       0x3 << ( 3 * 2 ) | 0x3 << ( 4 * 2 ) | 0x3 << ( 5 * 2 ) |
+                       0x3 << ( 6 * 2 ) | 0x3 << ( 7 * 2 ) );
+    GPIOB->MODER |=  ( 0x1 << ( 0 * 2 ) | 0x1 << ( 1 * 2 ) | 0x1 << ( 2 * 2 ) |
+                       0x1 << ( 3 * 2 ) | 0x1 << ( 4 * 2 ) | 0x1 << ( 5 * 2 ) |
+                       0x1 << ( 6 * 2 ) | 0x1 << ( 7 * 2 ) );
+  #endif
+
+  // Configure pins B8, B9, for output.
+  #ifdef VVC_F1
+    GPIOB->CRH &= ~( GPIO_CRH_MODE8 | GPIO_CRH_MODE9 );
+    GPIOB->CRH |=  ( 0x3 << GPIO_CRH_MODE8_Pos | 0x3 << GPIO_CRH_MODE9_Pos );
+  #elif VVC_L4
+    GPIOB->MODER &= ~( 0x3 << ( 8 * 2 ) | 0x3 << ( 9 * 2 ) );
+    GPIOB->MODER |=  ( 0x1 << ( 8 * 2 ) | 0x1 << ( 9 * 2 ) );
+  #endif
+}
+/* -------------------------------------------------------------------------- */
 // main function
 int main()
 {
@@ -205,8 +242,11 @@ int main()
   // Initialize the ADC.
   init_adc();
 
-  delayMS(200);
-  printf( "\r\nDesafio 2022\r\n");
+  // Initialize the GPIO.
+  init_gpio();
+
+  delay(200);
+  // printf( "\r\nDesafio 2022\r\n");
 
   // Loop forever.
   while ( 1 )
@@ -217,17 +257,24 @@ int main()
     // Send the ADC value over the USART.
     printf( "ADC:%u\r\n",adc);
 
-    // Calculate the ADC voltage.
-    float voltage = ( ( float ) adc / 4095.0 ) * 3.3;
-    // Convert float to int
-    int voltage_int = (int) (voltage);
-    int voltage_dec = (int) ((voltage - voltage_int) * 1000);
-    
-    // Send the ADC voltage over the USART.
-    printf( "V:%d.%d\r\n",voltage_int,voltage_dec);
+    // Calculate the ADC value in volts.
+    float volts = (float)adc * 3.3 / 4096.0;
 
-    // delay 2 seconds
-    delayMS(2000);
+    // Calculate the ADC value in volts
+
+    // Send the ADC value in volts over the USART.
+    // converting each digit to a character making a total of 3 digits.
+    printf( "V:%u.%u%u\r\n",(uint8_t)volts,(uint8_t)(volts*10)%10,(uint8_t)(volts*100)%10);
     
+    // Write voltage to GPIO
+    // First digit is between 0 and 3
+    GPIOB->ODR = (uint8_t)volts;
+    // Second and third digit is between 0 and 9
+    GPIOB->ODR |= (uint8_t)(volts*10)%10 << 2;
+    GPIOB->ODR |= (uint8_t)(volts*100)%10 << 6;
+
+    
+    // delay 2 seconds
+    delay(2000);
   }
 }
