@@ -1,5 +1,4 @@
-(Contenido crudo del archivo .docx)
- **Trabajo Práctico Nº5 (Desafío 2022):**
+﻿**Trabajo Práctico Nº5 (Desafío 2022):**
 
 **Manejo de Comunicaciones seriales y conversores ADC con Microcontroladores ARM**
 
